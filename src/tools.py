@@ -23,7 +23,7 @@ SEARCH_POLICY_TOOL = {
                 "type": "string",
                 "description": (
                     "Optional. An exact filename to restrict the search to a single document, "
-                    "e.g. 'homeowners_policy.md'. Get valid filenames from list_documents. "
+                    "e.g. 'sample_renters_policy.pdf'. Get valid filenames from list_documents. "
                     "If omitted, all documents are searched."
                 ),
             },
@@ -32,20 +32,55 @@ SEARCH_POLICY_TOOL = {
     },
 }
 
-TOOLS = [SEARCH_POLICY_TOOL]
-
 def search_policy(query, doc_filter=None):
     top_score = 0.72
     reliable = top_score >= THRESHOLD
     return {
         "chunks": ["Water damage from sudden pipe bursts is covered under Section 4."],
-        "source_files": ["homeowners_policy.md"],
+        "source_files": ["sample_renters_policy.pdf"],
         "top_score": top_score,
         "reliable": reliable
     }
 
+LIST_DOCUMENTS_TOOL = {
+    "name": "list_documents",
+    "description": (
+        "List every insurance policy document currently indexed, with a one-line "
+        "summary of what each one covers. Takes no input. Call this BEFORE searching "
+        "when you do not know which documents exist, or after a search returned a low "
+        "top_score and you want to retry against a single specific document. Returns a "
+        "list of objects, each with a 'filename' and a 'summary'. Use the summaries to "
+        "decide which document is most likely to answer the question, then pass that "
+        "exact filename as the doc_filter argument to search_policy."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {},
+    },
+}
+
+def list_documents():
+    return {
+        "documents": [
+            {
+                "filename": "sample_auto_policy.pdf",
+                "summary": "Personal auto policy: liability, collision, comprehensive, "
+                           "uninsured motorist, rental reimbursement.",
+            },
+            {
+                "filename": "sample_renters_policy.pdf",
+                "summary": "Renters policy: personal property, loss of use, personal "
+                           "liability, medical payments to others.",
+            },
+        ],
+    }
+
+TOOLS = [SEARCH_POLICY_TOOL, LIST_DOCUMENTS_TOOL]
+
 def run_tool(name, tool_input):
     if name == "search_policy":
         return search_policy(**tool_input)
+    if name == "list_documents":
+        return list_documents(**tool_input)
     return {"error": f"Unknown tool: {name}"}
 
