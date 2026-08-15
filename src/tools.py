@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 THRESHOLD = 0.45
 
 SEARCH_POLICY_TOOL = {
@@ -75,12 +76,53 @@ def list_documents():
         ],
     }
 
-TOOLS = [SEARCH_POLICY_TOOL, LIST_DOCUMENTS_TOOL]
+ESCALATE_TO_HUMAN_TOOL = {
+    "name": "escalate_to_human",
+    "description": (
+        "Hand off to a human agent when you cannot produce a grounded answer. "
+        "This is terminal: after calling it, do not call any other tool and do not attempt "
+        "to answer from your own knowledge. Pass the users' original question and the reason "
+        "the attempt failed. Call this only after the retry budget is exhausted or no reliable "
+        "source was found. "
+
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "question": {
+                "type": "string",
+                "description": "list the question that the user asked",
+            },
+            "reason": {
+                "type": "string",
+                "enum": ["no_reliable_source", "retry_budget_exhausted"],
+                "description": (
+                    "use no_reliable_source when searches returned results but none met the reliability bar "
+                    "use retry_budget_exhausted when the retry limit was reached without a reliable result "
+                )
+            },
+        },
+        "required": ["question", "reason"],
+    },
+}
+
+def escalate_to_human(question, reason):
+    return{
+        "escalated": True, 
+        "question": question,
+        "reason": reason,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+TOOLS = [SEARCH_POLICY_TOOL, LIST_DOCUMENTS_TOOL, ESCALATE_TO_HUMAN_TOOL]
 
 def run_tool(name, tool_input):
     if name == "search_policy":
         return search_policy(**tool_input)
     if name == "list_documents":
         return list_documents(**tool_input)
+    if name == "escalate_to_human":
+        return escalate_to_human(**tool_input)
     return {"error": f"Unknown tool: {name}"}
 
