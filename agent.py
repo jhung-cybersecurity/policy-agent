@@ -42,6 +42,8 @@ while response.stop_reason == "tool_use" and iters < MAX_ITERS and not escalated
             print(f"[iter {iters}] {block.name}({block.input})")
             try:
                 result = run_tool(block.name, block.input)
+                if block.name == "search_policy":
+                    print(f"   -> top_score={result['top_score']} reliable={result['reliable']} files={result['source_files']}")
                 if block.name == "escalate_to_human":
                     escalated = True
                     escalation = result
@@ -51,6 +53,7 @@ while response.stop_reason == "tool_use" and iters < MAX_ITERS and not escalated
                     "content": json.dumps(result),
                 })
             except Exception as exc:
+                print(f"   -> ERROR: {type(exc).__name__}: {exc}")
                 tool_results.append({
                     "type": "tool_result",
                     "tool_use_id": block.id,

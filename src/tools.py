@@ -1,5 +1,7 @@
 from datetime import datetime, timezone
+import httpx
 THRESHOLD = 0.45
+RAG_URL = "http://localhost:8000/ask"
 
 SEARCH_POLICY_TOOL = {
     "name": "search_policy",
@@ -10,8 +12,6 @@ SEARCH_POLICY_TOOL = {
         "chunk on a 0 to 1 scale. Use this whenever the user asks about coverage, "
         "exclusions, limits, or policy terms. A top_score below 0.45 means no chunk "
         "is a reliable match and the answer should NOT be drawn from those chunks. "
-        "This tool does not tell you which documents exist; call list_documents first "
-        "if you need to narrow the search with doc_filter."
     ),
     "input_schema": {
         "type": "object",
@@ -23,9 +23,9 @@ SEARCH_POLICY_TOOL = {
             "doc_filter": {
                 "type": "string",
                 "description": (
-                    "Optional. An exact filename to restrict the search to a single document, "
-                    "e.g. 'sample_renters_policy.pdf'. Get valid filenames from list_documents. "
-                    "If omitted, all documents are searched."
+                    "NOT CURRENTLY SUPPORTED. Document filtering is not yet implemented on the "
+                    "search backend, so this argument is ignored and all documents are always "
+                    "searched. Do not rely on it to narrow results."
                 ),
             },
         },
@@ -34,13 +34,24 @@ SEARCH_POLICY_TOOL = {
 }
 
 def search_policy(query, doc_filter=None):
-    top_score = 0.72
+    response = httpx.post(
+        RAG_URL,
+        json={"question": query},
+        timeout=60.0,
+    )
+    response.raise_for_status()
+    data = response.json()
+
+    sources = data["sources"]
+    top_score = data["top_score"]
     reliable = top_score >= THRESHOLD
+
     return {
-        "chunks": ["Water damage from sudden pipe bursts is covered under Section 4."],
-        "source_files": ["sample_renters_policy.pdf"],
+        "answer": data["answer"],
+        "chunks": [s["text"] for s in sources],
+        "source_files": list({s["source"] for s in sources}),
         "top_score": top_score,
-        "reliable": reliable
+        "reliable": reliable,
     }
 
 LIST_DOCUMENTS_TOOL = {
@@ -48,11 +59,11 @@ LIST_DOCUMENTS_TOOL = {
     "description": (
         "List every insurance policy document currently indexed, with a one-line "
         "summary of what each one covers. Takes no input. Call this BEFORE searching "
-        "when you do not know which documents exist, or after a search returned a low "
-        "top_score and you want to retry against a single specific document. Returns a "
+        "when you do not know which documents exist "
+        "and you want to retry against a single specific document. Returns a "
         "list of objects, each with a 'filename' and a 'summary'. Use the summaries to "
-        "decide which document is most likely to answer the question, then pass that "
-        "exact filename as the doc_filter argument to search_policy."
+        "understand what is avaliable and to phrase follow-up searches using terms likely "
+        "to appear in the relevant document. Filtering by document is not currently supported."
     ),
     "input_schema": {
         "type": "object",
